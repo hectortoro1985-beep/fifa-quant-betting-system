@@ -3,9 +3,10 @@ import sys
 
 import pandas as pd
 import streamlit as st
+import plotly.express as px
 
 
-# Agregar raíz del proyecto
+# ROOT PROJECT
 project_root = os.path.abspath(
     os.path.join(
         os.path.dirname(__file__),
@@ -21,6 +22,7 @@ from predictions.value_betting import ValueBetting
 from utils.data_loader import DataLoader
 
 
+# PAGE CONFIG
 st.set_page_config(
     page_title="FIFA Quant System",
     layout="wide"
@@ -29,12 +31,15 @@ st.set_page_config(
 st.title("⚽ FIFA Quant Betting System")
 
 
+# LOAD DATA
 matches = DataLoader.load_matches(
     "data/matches.csv"
 )
 
 results = []
 
+
+# ANALYSIS LOOP
 for _, row in matches.iterrows():
 
     home_team = row['home_team']
@@ -109,8 +114,56 @@ for _, row in matches.iterrows():
     })
 
 
+# DATAFRAME
 df = pd.DataFrame(results)
 
+
+# KPIs
+total_matches = len(df)
+
+value_bets = len(
+    df[df['Value Bet'] == True]
+)
+
+avg_ev = round(
+    df['EV %'].mean(),
+    2
+)
+
+best_ev = round(
+    df['EV %'].max(),
+    2
+)
+
+
+# KPI ROW
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric(
+    "Matches",
+    total_matches
+)
+
+col2.metric(
+    "Value Bets",
+    value_bets
+)
+
+col3.metric(
+    "Average EV %",
+    avg_ev
+)
+
+col4.metric(
+    "Best EV %",
+    best_ev
+)
+
+
+st.divider()
+
+
+# FULL TABLE
 st.subheader("📊 Match Analysis")
 
 st.dataframe(
@@ -118,13 +171,34 @@ st.dataframe(
     use_container_width=True
 )
 
-st.subheader("🔥 Value Bets")
 
-value_bets = df[
+# FILTER VALUE BETS
+st.subheader("🔥 Positive EV Bets")
+
+positive_ev = df[
     df['Value Bet'] == True
 ]
 
 st.dataframe(
-    value_bets,
+    positive_ev,
+    use_container_width=True
+)
+
+
+# BAR CHART
+st.subheader("📈 Expected Value Ranking")
+
+fig = px.bar(
+    df.sort_values(
+        by='EV %',
+        ascending=False
+    ),
+    x='Match',
+    y='EV %',
+    text='EV %'
+)
+
+st.plotly_chart(
+    fig,
     use_container_width=True
 )
