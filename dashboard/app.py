@@ -19,6 +19,7 @@ sys.path.append(project_root)
 
 from models.poisson_model import PoissonModel
 from predictions.value_betting import ValueBetting
+from predictions.bankroll import BankrollManagement
 from utils.data_loader import DataLoader
 
 
@@ -35,6 +36,15 @@ st.title("⚽ FIFA Quant Betting System")
 matches = DataLoader.load_matches(
     "data/matches.csv"
 )
+
+
+# BANKROLL SYSTEM
+bankroll_system = (
+    BankrollManagement(
+        bankroll=1000
+    )
+)
+
 
 results = []
 
@@ -76,6 +86,20 @@ for _, row in matches.iterrows():
         )
     )
 
+    kelly_percent = (
+        bankroll_system.kelly_criterion(
+            probabilities['home_win'] / 100,
+            home_odds
+        )
+    )
+
+    recommended_stake = (
+        bankroll_system.recommended_stake(
+            probabilities['home_win'] / 100,
+            home_odds
+        )
+    )
+
     results.append({
 
         "Match":
@@ -110,7 +134,13 @@ for _, row in matches.iterrows():
         value_analysis['expected_value'],
 
         "Value Bet":
-        value_analysis['is_value_bet']
+        value_analysis['is_value_bet'],
+
+        "Kelly %":
+        kelly_percent,
+
+        "Recommended Stake":
+        recommended_stake
     })
 
 
@@ -200,5 +230,24 @@ fig = px.bar(
 
 st.plotly_chart(
     fig,
+    use_container_width=True
+)
+
+
+# KELLY CHART
+st.subheader("💰 Kelly Criterion")
+
+kelly_chart = px.bar(
+    df.sort_values(
+        by='Kelly %',
+        ascending=False
+    ),
+    x='Match',
+    y='Kelly %',
+    text='Kelly %'
+)
+
+st.plotly_chart(
+    kelly_chart,
     use_container_width=True
 )
