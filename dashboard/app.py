@@ -6,7 +6,6 @@ import streamlit as st
 import plotly.express as px
 
 
-# ROOT PROJECT
 project_root = os.path.abspath(
     os.path.join(
         os.path.dirname(__file__),
@@ -20,28 +19,36 @@ sys.path.append(project_root)
 from models.poisson_model import PoissonModel
 from predictions.value_betting import ValueBetting
 from predictions.bankroll import BankrollManagement
+from predictions.performance_tracker import PerformanceTracker
 from utils.data_loader import DataLoader
 
 
-# PAGE CONFIG
 st.set_page_config(
     page_title="FIFA Quant System",
     layout="wide"
 )
 
-st.title("⚽ FIFA Quant Betting System")
+st.title("⚽ Sistema Cuantitativo de Apuestas FIFA")
 
 
-# LOAD DATA
 matches = DataLoader.load_matches(
     "data/matches.csv"
 )
 
+results_data = DataLoader.load_matches(
+    "data/results.csv"
+)
 
-# BANKROLL SYSTEM
+
 bankroll_system = (
     BankrollManagement(
         bankroll=1000
+    )
+)
+
+tracker = (
+    PerformanceTracker(
+        starting_bankroll=1000
     )
 )
 
@@ -49,7 +56,6 @@ bankroll_system = (
 results = []
 
 
-# ANALYSIS LOOP
 for _, row in matches.iterrows():
 
     home_team = row['home_team']
@@ -60,6 +66,23 @@ for _, row in matches.iterrows():
 
     home_odds = row['home_odds']
 
+    match_name = (
+        f"{home_team} vs {away_team}"
+    )
+
+    result_row = (
+        results_data[
+            results_data['match']
+            == match_name
+        ]
+    )
+
+    final_result = (
+        result_row.iloc[0]['result']
+        if not result_row.empty
+        else "PERDIDA"
+    )
+
     model = PoissonModel(
         home_xg,
         away_xg
@@ -69,7 +92,9 @@ for _, row in matches.iterrows():
         model.calculate_probabilities()
     )
 
-    score = model.most_likely_score()
+    score = (
+        model.most_likely_score()
+    )
 
     over_under = (
         model.over_under_probabilities()
@@ -93,17 +118,28 @@ for _, row in matches.iterrows():
         )
     )
 
-    recommended_stake = (
+    stake = (
         bankroll_system.recommended_stake(
             probabilities['home_win'] / 100,
             home_odds
         )
     )
 
+    profit = (
+        tracker.calculate_profit(
+            stake,
+            home_odds,
+            final_result
+        )
+    )
+
     results.append({
 
-        "Match":
-        f"{home_team} vs {away_team}",
+        "Partido":
+        match_name,
+
+        "Result":
+        final_result,
 
         "Home Win %":
         probabilities['home_win'],
@@ -139,115 +175,104 @@ for _, row in matches.iterrows():
         "Kelly %":
         kelly_percent,
 
-        "Recommended Stake":
-        recommended_stake
+        "Stake":
+        stake,
+
+        "Profit":
+        profit
     })
 
 
-# DATAFRAME
 df = pd.DataFrame(results)
 
 
-# KPIs
-total_matches = len(df)
-
-value_bets = len(
-    df[df['Value Bet'] == True]
-)
-
-avg_ev = round(
-    df['EV %'].mean(),
+total_profit = round(
+    df['Profit'].sum(),
     2
 )
 
-best_ev = round(
-    df['EV %'].max(),
+total_staked = round(
+    df['Stake'].sum(),
+    2
+)
+
+wins = len(
+    df[df['Result'] == "WIN"]
+)
+
+total_bets = len(df)
+
+roi = tracker.roi(
+    total_profit
+)
+
+yield_pct = (
+    tracker.yield_percentage(
+        total_profit,
+        total_staked
+    )
+)
+
+win_rate = (
+    tracker.win_rate(
+        wins,
+        total_bets
+    )
+)
+
+current_bankroll = round(
+    1000 + total_profit,
     2
 )
 
 
-# KPI ROW
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric(
-    "Matches",
-    total_matches
+    "Bankroll Actual",
+    f"${current_bankroll}"
 )
 
 col2.metric(
-    "Value Bets",
-    value_bets
+    "Ganancia",
+    f"${total_profit}"
 )
 
 col3.metric(
-    "Average EV %",
-    avg_ev
+    "ROI %",
+    roi
 )
 
 col4.metric(
-    "Best EV %",
-    best_ev
+    "Rendimiento %",
+    yield_pct
+)
+
+col5.metric(
+    "Acierto %",
+    win_rate
 )
 
 
 st.divider()
 
-
-# FULL TABLE
-st.subheader("📊 Match Analysis")
-
+st.subheader("📊 Seguimiento de Rendimiento")
 st.dataframe(
     df,
     use_container_width=True
 )
 
 
-# FILTER VALUE BETS
-st.subheader("🔥 Positive EV Bets")
-
-positive_ev = df[
-    df['Value Bet'] == True
-]
-
-st.dataframe(
-    positive_ev,
-    use_container_width=True
-)
-
-
-# BAR CHART
-st.subheader("📈 Expected Value Ranking")
+st.subheader("📈 Ganancia por Partido")
 
 fig = px.bar(
-    df.sort_values(
-        by='EV %',
-        ascending=False
-    ),
-    x='Match',
-    y='EV %',
-    text='EV %'
+    df,
+    x="Partido",
+    y="Profit",
+    text="Profit"
 )
 
 st.plotly_chart(
     fig,
-    use_container_width=True
-)
-
-
-# KELLY CHART
-st.subheader("💰 Kelly Criterion")
-
-kelly_chart = px.bar(
-    df.sort_values(
-        by='Kelly %',
-        ascending=False
-    ),
-    x='Match',
-    y='Kelly %',
-    text='Kelly %'
-)
-
-st.plotly_chart(
-    kelly_chart,
     use_container_width=True
 )
