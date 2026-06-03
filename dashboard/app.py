@@ -54,7 +54,7 @@ tracker = (
 
 
 results = []
-
+current_bankroll_tracker = 1000
 
 for _, row in matches.iterrows():
 
@@ -132,7 +132,7 @@ for _, row in matches.iterrows():
             final_result
         )
     )
-
+    current_bankroll_tracker += profit
     results.append({
 
         "Partido":
@@ -175,12 +175,18 @@ for _, row in matches.iterrows():
         "Kelly %":
         kelly_percent,
 
-        "Stake":
-        stake,
+       "Stake":
+stake,
 
-        "Profit":
-        profit
-    })
+"Profit":
+profit,
+
+"Bankroll":
+round(
+    current_bankroll_tracker,
+    2
+)
+})
 
 
 df = pd.DataFrame(results)
@@ -274,5 +280,18 @@ fig = px.bar(
 
 st.plotly_chart(
     fig,
+    use_container_width=True
+)
+st.subheader("💰 Evolución del Bankroll")
+
+fig_bankroll = px.line(
+    df,
+    x="Partido",
+    y="Bankroll",
+    markers=True
+)
+
+st.plotly_chart(
+    fig_bankroll,
     use_container_width=True
 )
