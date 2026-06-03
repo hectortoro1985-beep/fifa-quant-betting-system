@@ -74,3 +74,33 @@ class PerformanceTracker:
             rate,
             2
         )
+
+    def max_drawdown(
+        self,
+        bankroll_series
+    ):
+
+        if len(bankroll_series) == 0:
+            return 0
+
+        peak = bankroll_series[0]
+
+        max_dd = 0
+
+        for bankroll in bankroll_series:
+
+            if bankroll > peak:
+                peak = bankroll
+
+            drawdown = (
+                (bankroll - peak)
+                / peak
+            ) * 100
+
+            if drawdown < max_dd:
+                max_dd = drawdown
+
+        return round(
+            max_dd,
+            2
+        )
